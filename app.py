@@ -113,7 +113,7 @@ def temperature_by_start_date():
 
     """Return a list of all temperature values"""
     # Query all temp values
-    results = session.query(Measurement.tobs, Measurement.date)
+    results = session.query(Measurement.tobs, Measurement.date).all()
 
     Temp = []
     for date, tobs in results:
@@ -124,14 +124,14 @@ def temperature_by_start_date():
 
     session.close()
 
-    canonicalized = filter(func.strftime("%Y-%m-%d",Measurement.date) >= date.replace("%Y-%m-%d")
-    for date in Temp:
+    canonicalized = date.replace()
+    for dt in Temp:
         search_term = date["date"].replace("%Y-%m-%d").lower()
 
         if search_term == canonicalized:
             return jsonify(date)
 
-    return jsonify({"error": "Character not found."}), 404
+    return jsonify({"error": "not found."}), 404
 
 
 if __name__ == "__main__":
