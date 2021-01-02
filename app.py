@@ -4,7 +4,7 @@ import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
-
+import datetime as dt
 
 from flask import Flask, jsonify
 
@@ -41,6 +41,8 @@ def welcome():
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
+        f"/api/v1.0/<start><br/>"
+        f"/api/v1.0/<start>/<end>"
     )
 
 @app.route("/api/v1.0/precipitation")
@@ -49,16 +51,23 @@ def precipitation():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of all passenger names"""
-    # Query all passengers
-    results = session.query(Measurement).all()
+    """Return a list of all precipitation values"""
+    # Query all precipitation
+    results = session.query(Measurement.date, Measurement.prcp).all()
+
+    precipitation = []
+    for date, prcp in results:
+        precipitation_dict = {}
+        precipitation_dict["date"] = date
+        precipitation_dict["prcp"] = prcp
+        precipitation.append(precipitation_dict)
 
     session.close()
 
     # Convert list of tuples into normal list
-    all_names = list(np.ravel(results))
+    #precipitation = list(np.ravel(precipitation))
 
-    return jsonify(all_names)
+    return jsonify(precipitation)
 
 
 
@@ -67,16 +76,16 @@ def stations():
      # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of all passenger names"""
-    # Query all passengers
-    results = session.query(Station).all()
+    """Return a list of all stations"""
+    # Query all stations
+    results = session.query(Measurement.station).group_by(Measurement.station).all()
 
     session.close()
 
     # Convert list of tuples into normal list
-    all_names = list(np.ravel(results))
+    station = list(np.ravel(results))
 
-    return jsonify(all_names)
+    return jsonify(station)
 
 
 @app.route("/api/v1.0/tobs")
@@ -84,16 +93,45 @@ def tobs():
      # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of all passenger names"""
-    # Query all passengers
-    results = session.query(Measurement.tobs).all()
+    """Return a list of all temperature values"""
+    # Query all temps from the last year for the station with the most activity
+    results = session.query(Measurement.tobs, Measurement.station, Measurement.date).filter(Measurement.station == "USC00519281").filter(func.strftime("%Y-%m-%d",Measurement.date) >= dt.date(2016, 8, 18)).all()
 
     session.close()
 
     # Convert list of tuples into normal list
-    all_names = list(np.ravel(results))
+    temperature = list(np.ravel(results))
 
-    return jsonify(all_names)
+    return jsonify(temperature)
+
+
+@app.route("/api/v1.0/<start>")
+def temperature_by_start_date():
+
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    """Return a list of all temperature values"""
+    # Query all temp values
+    results = session.query(Measurement.tobs, Measurement.date)
+
+    Temp = []
+    for date, tobs in results:
+        Temp_dict = {}
+        Temp_dict["date"] = date
+        Temp_dict["temp"] = tobs
+        Temp.append(Temp_dict)
+
+    session.close()
+
+    canonicalized = filter(func.strftime("%Y-%m-%d",Measurement.date) >= date.replace("%Y-%m-%d")
+    for date in Temp:
+        search_term = date["date"].replace("%Y-%m-%d").lower()
+
+        if search_term == canonicalized:
+            return jsonify(date)
+
+    return jsonify({"error": "Character not found."}), 404
 
 
 if __name__ == "__main__":
