@@ -38,11 +38,18 @@ def welcome():
     """List all available api routes."""
     return (
         f"Available Routes:<br/>"
+        f"<br/>"
         f"/api/v1.0/precipitation<br/>"
+        f"<br/>"
         f"/api/v1.0/stations<br/>"
+        f"<br/>"
         f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/<start><br/>"
-        f"/api/v1.0/<start>/<end>"
+        f"<br/>"
+        f"/api/v1.0/start<br/>"
+        f"**start date should be entered as yyyy-mm-dd**<br/>"
+        f"<br/>"
+        f"/api/v1.0/start/end<br/>"
+        f"**start and end dates should be entered as yyyy-mm-dd**"
     )
 
 @app.route("/api/v1.0/precipitation")
@@ -62,13 +69,10 @@ def precipitation():
         precipitation_dict["prcp"] = prcp
         precipitation.append(precipitation_dict)
 
+
     session.close()
 
-    # Convert list of tuples into normal list
-    #precipitation = list(np.ravel(precipitation))
-
     return jsonify(precipitation)
-
 
 
 @app.route("/api/v1.0/stations")
@@ -95,44 +99,76 @@ def tobs():
 
     """Return a list of all temperature values"""
     # Query all temps from the last year for the station with the most activity
-    results = session.query(Measurement.tobs, Measurement.station, Measurement.date).filter(Measurement.station == "USC00519281").filter(func.strftime("%Y-%m-%d",Measurement.date) >= dt.date(2016, 8, 18)).all()
+
+    all_stations = session.query((func.count(Measurement.station)), Measurement.station).\
+    group_by(Measurement.station).\
+    order_by(func.count(Measurement.station).desc()).all()
+
+    query_date_2 = dt.date(2017, 8, 18) - dt.timedelta(days=365)
+
+    last_year = session.query(Measurement.tobs, Measurement.station, Measurement.date).\
+    filter(Measurement.station == all_stations[0][1]).\
+    filter(func.strftime("%Y-%m-%d",Measurement.date) >= query_date_2).all()
 
     session.close()
 
     # Convert list of tuples into normal list
-    temperature = list(np.ravel(results))
+    temperature = list(np.ravel(last_year))
 
     return jsonify(temperature)
 
 
 @app.route("/api/v1.0/<start>")
-def temperature_by_start_date():
+def temperature_by_start_date(start):
 
     # Create our session (link) from Python to the DB
     session = Session(engine)
+    
+    ################################################
+    # Return a JSON list of the minimum temperature, the average temperature, 
+    # and the max temperature for a given start
+    ##################################################
 
-    """Return a list of all temperature values"""
-    # Query all temp values
-    results = session.query(Measurement.tobs, Measurement.date).all()
+    results = session.query(func.min(Measurement.tobs),func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+filter(Measurement.date >= start).order_by(Measurement.date.desc()).all()
 
     Temp = []
-    for date, tobs in results:
+    for temps in results:
         Temp_dict = {}
-        Temp_dict["date"] = date
-        Temp_dict["temp"] = tobs
+        Temp_dict["Minimum Temp"] = results[0][0]
+        Temp_dict["Maximum Temp"] = results[0][1]
+        Temp_dict["Average Temp"] = results[0][2]
         Temp.append(Temp_dict)
 
     session.close()
 
-    canonicalized = date.replace()
-    for dt in Temp:
-        search_term = date["date"].replace("%Y-%m-%d").lower()
+    return jsonify(Temp)
 
-        if search_term == canonicalized:
-            return jsonify(date)
+@app.route("/api/v1.0/<start>/<end>")
+def temperature_by_start_end(start, end):
 
-    return jsonify({"error": "not found."}), 404
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+    
+    ################################################
+    # Return a JSON list of the minimum temperature, the average temperature, 
+    # and the max temperature for a given start and end date
+    ##################################################
 
+    results = session.query(func.min(Measurement.tobs),func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+filter(Measurement.date >= start, Measurement.date <= end).order_by(Measurement.date.desc()).all()
+
+    Temp2 = []
+    for temps in results:
+        Temp2_dict = {}
+        Temp2_dict["Minimum Temp"] = results[0][0]
+        Temp2_dict["Maximum Temp"] = results[0][1]
+        Temp2_dict["Average Temp"] = results[0][2]
+        Temp2.append(Temp2_dict)
+
+    session.close()
+
+    return jsonify(Temp2)
 
 if __name__ == "__main__":
     app.run(debug=True)
